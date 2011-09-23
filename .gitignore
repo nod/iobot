@@ -1,0 +1,68 @@
+# git-ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+.DS_Store
+*.swp
+*~.nib
+*.log
+*.log.?
+
+media/*
+
+# pip local installs will end up adding a src/ directory. we dont want that in
+# the repo
+src/
+
+givepath/providers/foursquare_cats.json
+
+settings_local.py
+fabfile_local.py
+
+# don't add compiled mess to the repo
+*.la
+*.lo
+*.Plo
+*.o
+# following gets built during ./configure
+misc/pcre-8.12/pcre_chartables.c
+misc/nginx-0.9.4/objs
+misc/nginx-0.9.4/Makefile
+misc/pcre-8.12/.libs
+misc/pcre-8.12/libtool
+
+.mongo/
+misc/beanstalkd-1.4.6/
+misc/libevent-2.0.10-stable/
+
+# built from supervisord.conf.in
+supervisord/supervisord.conf
+supervisord/supervisord.*
+
+# provider testcases create a cache subdirectory that can be ignored
+cache/
+
+# ignore directories created when billing testcases are run
+scripts/billing/invoices/
+scripts/billing/tests/dump/
+
+settings_local.py
+build
+
+*.pbxuser
+*.perspective
+*.perspectivev3
+
+*.mode1v3
+*.mode2v3
+
+*.pyc
+*.sqlite3
+*.db
+
+*.mp3
+*.mp4
+*.m4p
+*.mov

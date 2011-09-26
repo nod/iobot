@@ -22,13 +22,13 @@ from time import sleep, time
 from cPickle import dumps, loads
 from pprint import pformat
 
-NETWORKNAME = "p4rtee line"
+NETWORKNAME = "iobot testnet"
 MOTD = """Welcome to the %s!""" % NETWORKNAME
 
 MAXPINGTIMEOUT = 600.0
 
 
-TABLE_PREFIX = 'p4rtee'
+TABLE_PREFIX = 'iobtest'
 USERTABLE = '%s_users' % TABLE_PREFIX
 CHANTABLE = '%s_chans' % TABLE_PREFIX
 
@@ -844,7 +844,7 @@ class IRCHandler(threading.Thread):
             self.s.sendall("ERROR :Closing link: %s (%s)\n" % (self.addrinfo[0], reason))
             self.IRC_hasquit = True
             self.s.close()
-            for chan in [i for i in self.channels]:
+            for chan in self.channels:
                 try: channel = self.channels[chan]
                 except: continue
                 try: channel.remove(self, True, reason)
@@ -1161,7 +1161,7 @@ class IRCServer:
 
 if __name__ == '__main__':
     port = 6667
-    host = "irc.aquinas.area51.mil"
+    host = "iobot.testnet"
     while True:
         print "Trying port %d\r" % port
         try:

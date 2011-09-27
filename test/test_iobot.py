@@ -31,8 +31,8 @@ class BotTestCases(AsyncTestCase):
     def setUpClass(cls):
         cls.port = randint(4000,9999)
         cls.host = '127.0.0.1'
-        cls.fakeircd = FakeIrcServer(cls.host, cls.port)
-        cls.fakeircd.start()
+        # cls.fakeircd = FakeIrcServer(cls.host, cls.port)
+        # cls.fakeircd.start()
         cls.bot = IOBot(nick='testbot', host=cls.host, port=cls.port)
 
     def setUp(self):
@@ -48,11 +48,8 @@ class BotTestCases(AsyncTestCase):
 
     def test_join(self):
         chan = '#testchan'
-        print "before joinchan"
         self.bot.joinchan(chan, callback=self.stop)
-        print "after joinchan"
         self.wait()
-        print "after wait"
 
         assert(nick in self.fakeircd.ircd.chans[chan].users)
 

@@ -23,7 +23,9 @@ class FakeIrcServer(threading.Thread):
 class BotTestCases(AsyncTestCase):
 
     def get_new_ioloop(self):
-        return IOLoop.instance()
+        if not hasattr(self, 'io_loop'):
+            self.io_loop = IOLoop.instance()
+        return self.io_loop
 
     @classmethod
     def setUpClass(cls):
@@ -33,9 +35,16 @@ class BotTestCases(AsyncTestCase):
         cls.fakeircd.start()
         cls.bot = IOBot(nick='testbot', host=cls.host, port=cls.port)
 
+    def setUp(self):
+        # the ioloop needs time to spin for other tasks.  it's lame but we're
+        # going to add a callback in a couple of secs to let things go
+        io_loop = self.get_new_ioloop()
+        io_loop.add_timeout(time.time()+1, self.stop)
+        self.wait()
+
     def test_ping(self):
         # going to fake a PING from the server on this one
-        assert(self.bot._is_ping('PING :12345'))
+        assert(self.bot._handle_ping('PING :12345'))
 
     def test_join(self):
         chan = '#testchan'

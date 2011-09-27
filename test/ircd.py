@@ -465,7 +465,6 @@ class IRCHandler(threading.Thread):
         c.kick(self, user, reason)
         self.server.chanserv.event_part(self.nicks[user], c)
 
-
     def IRC_part(self, (chans, reason)):
         """1-2"""
         if reason == None: reason = ''

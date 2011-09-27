@@ -46,7 +46,6 @@ class BotTestCases(AsyncTestCase):
     def spin_till_connect(self, first=False):
         # we need the ircbot to be connected to the stupid server
         self._spin_count += 1
-        print self._spin_count
         if self._spin_count > 1000: raise Exception('spun out of control')
         if not first:
             self.wait()

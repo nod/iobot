@@ -5,7 +5,7 @@ from random import randint
 from tornado.ioloop import IOLoop
 from tornado.testing import AsyncTestCase
 
-from ircd import IRCServer
+from .ircd import IRCServer
 from ..iobot import IOBot
 
 

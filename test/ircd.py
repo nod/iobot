@@ -639,9 +639,9 @@ class IRCServer:
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.bind(address)
 
-    def __del__(self):
-        try: self.s.close()
-        except Exception, e: pass
+    def stop(self):
+        print "del called on server"
+        self.s.close()
 
     def run(self):
         self.s.listen(self.backlog)

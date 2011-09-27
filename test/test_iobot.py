@@ -16,6 +16,10 @@ class FakeIrcServer(threading.Thread):
         self.host = host
         self.port = port
 
+    def stop(self):
+        print "deling server"
+        self.ircd.stop()
+
     def run(self):
         self.ircd = IRCServer((self.host, self.port), 'test.example.com')
         self.ircd.run()
@@ -29,8 +33,14 @@ class BotTestCases(AsyncTestCase):
         return self.io_loop
 
     @classmethod
+    def tearDownClass(cls):
+        print "teardown called"
+        cls.fakeircd.stop()
+
+    @classmethod
     def setUpClass(cls):
         cls.port = randint(4000,9999)
+        print "PORT", cls.port
         cls.host = '127.0.0.1'
         cls.nick = 'testbot'
         cls.fakeircd = FakeIrcServer(cls.host, cls.port)

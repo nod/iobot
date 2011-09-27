@@ -136,12 +136,16 @@ class IOBot(object):
 
 def main():
     import sys
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         print "usage: bot <nick> <chan>"
         raise SystemExit
     nn = sys.argv[1]
     cc = sys.argv[2]
-    ib = IOBot(nn, host='127.0.0.1')
+    ib = IOBot(
+        nn,
+        host='127.0.0.1',
+        port=(int(sys.argv[3] if len(sys.argv)==4 else PORT))
+        )
     ib.joinchan(cc)
     IOLoop.instance().start()
 

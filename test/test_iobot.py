@@ -6,7 +6,7 @@ from tornado.ioloop import IOLoop
 from tornado.testing import AsyncTestCase
 
 from ircd import IRCServer
-from src import IOBot
+from iobot import IOBot
 
 
 class FakeIrcServer(threading.Thread):

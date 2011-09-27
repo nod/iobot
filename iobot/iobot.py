@@ -67,8 +67,7 @@ class IOBot(object):
         self.cmds = { }
 
     def joinchan(self, chan, callback=None):
-        if self._connected:
-            self._stream.write("JOIN :%s\r\n" % chan, callback=callback)
+        self._stream.write("JOIN :%s\r\n" % chan, callback=callback)
         self.chans.add(chan)
 
     def sendchan(self, chan, msg):
@@ -85,8 +84,6 @@ class IOBot(object):
         self._connected = True
         self._stream.write("NICK %s\r\n" % self.nick)
         self._stream.write("USER %s %s bla :%s\r\n" % (IDENT, HOST, REALNAME))
-        for c in self.chans:
-            self.joinchan(c)
         self._next()
 
     def parse_line(self,line):

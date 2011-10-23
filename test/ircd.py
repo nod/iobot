@@ -374,7 +374,6 @@ class IRCHandler(threading.Thread):
                 except: continue
                 try: channel.remove(self, True, reason)
                 except: pass
-                self.server.chanserv.event_part(self, channel)
                 if channel.isempty(): del self.channels[chan]
         finally: self.server.lock.release_lock()
 
@@ -443,7 +442,6 @@ class IRCHandler(threading.Thread):
                 self.s.sendall(":%s 333 %s %s %s %s\n" % (self.host, self.data['nick'], chan, topicsetter, topicset))
             self.s.sendall(":%s 353 %s = %s :%s\n" % (self.host, self.data['nick'], chan, nicklist))
             self.s.sendall(":%s 366 %s %s :%s\n" % (self.host, self.data['nick'], chan, "End of /NAMES list"))
-            self.server.chanserv.event_join(self, c)
 
     def IRC_topic(self, (chan, topic)):
         """2"""
@@ -463,7 +461,6 @@ class IRCHandler(threading.Thread):
             raise IRCException("You behave like a professional. That's an order.", 482, chan)
         if self.data['nick'] == user: raise IRCException("I will not allow you to kick yourself", 482, chan)
         c.kick(self, user, reason)
-        self.server.chanserv.event_part(self.nicks[user], c)
 
     def IRC_part(self, (chans, reason)):
         """1-2"""
@@ -473,7 +470,6 @@ class IRCHandler(threading.Thread):
             try: c = self.channels[chan]
             except: continue
             c.remove(self, True, reason)
-            self.server.chanserv.event_part(self, c)
             try:
                 self.server.lock.acquire_lock()
                 if c.isempty(): del self.channels[chan]

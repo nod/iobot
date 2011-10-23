@@ -47,32 +47,82 @@ class BotPlugin(object):
         self.bot = bot
 
 
+class IrcProtoCmd(object):
+    def __init__(self, actn):
+        self.hooks = set()
+        self.actn = actn
+
+    def __call__(self, irc, ln):
+        self.actn(irc, ln)
+        for h in self.hooks: h(irc, ln)
+
+
+renick = re.compile("^(\w*?)!")
+
+class IrcObj(object):
+    # tries to guess about and populate something from an ircd statement
+    __slots__ = ('stoks', 'server_cmd', 'nick', 'chan',)
+
+    def __init__(self, line):
+        # seed our members with None
+        for s in self.__slots__: setattr(self, s, None)
+
+        if not line.startswith(":"):
+            # PING probably
+            stoks = line.split()
+            self.server_cmd = stoks[0].upper()
+        else:
+            tokens = line[1:].split(":")
+            if not tokens: return
+            stoks = tokens[0].split()
+
+            self.server_cmd = stoks[1].upper()
+
+            # find originator
+            nick = renick.findall(stoks[0])
+            if len(nick) == 1: self.nick = nick[0]
+
+    def __unicode__(self):
+        return ' :: '.join(
+            '{}:{}'.format(s,getattr(self,s)) for s in self.__slots__
+            )
+
+    def __repr__(self):
+        return self.__unicode__()
+
+
 class IOBot(object):
 
     def __init__(self, nick, host, port=6667, owner='iobot'):
-
         self.nick = nick
         self.chans = set()
         self.owner = owner
         self.host = host
         self.port = port
-
         self._connected = False
-
         self._connect()
-
         # used for parsing out nicks later, just wanted to compile it once
-        self._rnick = re.compile("^:(\w*?)!")
-        # build our command list
-        self.cmds = { }
+        # server protocol gorp
+        self._irc_proto = dict(
+            PRIVMSG = IrcProtoCmd(self._p_privmsg),
+            PING = IrcProtoCmd(self._p_ping),
+            JOIN = IrcProtoCmd(self._p_afterjoin),
+            )
+        # build our user command list
+        self.cmds = dict()
 
-    def joinchan(self, chan, callback=None):
-        self._stream.write("JOIN :%s\r\n" % chan, callback=callback)
-        self.chans.add(chan)
+    def hook(self, cmd, hook_f):
+        assert( cmd in self._irc_proto )
+        self._irc_proto[cmd].hooks.add(hook_f)
 
-    def sendchan(self, chan, msg):
-        if self._connected:
-            self._stream.write("PRIVMSG %s :%s\r\n" % (chan, msg))
+    def joinchan(self, chan):
+        self._stream.write("JOIN :%s\r\n" % chan)
+
+    def sendchan(self, chan, msg, callback=None):
+        self._stream.write(
+            "PRIVMSG %s :%s\r\n" % (chan, msg),
+            callback=callback
+            )
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -83,26 +133,28 @@ class IOBot(object):
         # send our initial mess
         self._connected = True
         self._stream.write("NICK %s\r\n" % self.nick)
-        self._stream.write("USER %s %s bla :%s\r\n" % (IDENT, HOST, REALNAME))
+        self._stream.write("USER %s 0 * :%s\r\n" % (IDENT, REALNAME))
         self._next()
 
-    def parse_line(self,line):
-        tokens = line.split(":")
-        if ( len(tokens) < 3 or
-                "PRIVMSG" not in tokens[1] ):
-            return None, None, None
-        # try to get the nick
-        nick = self._rnick.findall(line)
+    def parse_line(self, line):
+        irc = IrcObj(line)
+        if irc.server_cmd in self._irc_proto:
+            return self._irc_proto[irc.server_cmd](irc, line)
+        # log or something here
+
+    def _p_ping(self, irc, line):
+        self._stream.write("PONG %s\r\n" % line[1])
+
+    def _p_privmsg(self, irc, line):
+        nick = renick.findall(line)
         if len(nick) == 1: return tokens[1], nick[0], ' '.join(tokens[2:])
-        else: return None, None, ' '.join(tokens[2:])
 
-
-    def _handle_ping(self,line):
-        if line.startswith("PING"):
-            self._stream.write("PONG %s\r\n" % line[1])
-            return True
-        else: return False
-
+    def _p_afterjoin(self, irc, line):
+        toks = line.strip().split(':')
+        if irc.nick != self.nick:
+            return # we don't care right now if others join
+        irc.chan = toks[-1] # should be last token after last :
+        self.chans.add(irc.chan)
 
     def getcmd(self,cmd):
         if CMDCHAR and not cmd.startswith(CMDCHAR): return None
@@ -115,22 +167,12 @@ class IOBot(object):
         # finally, just fail
         return None
 
-
     def _next(self):
         # go back on the loop looking for the next line of input
         self._stream.read_until('\r\n', self._incoming)
 
-
     def _incoming(self, line):
-        print line,
-        if self._handle_ping(line): return self._next()
-        mask,nick,msg = self.parse_line(line)
-        toks = msg.split() if msg else False
-        if toks:
-            cmd = toks[0].strip()
-            c = self.getcmd(cmd)
-            print "cmd", nick, msg, c
-            if c: c(nick, toks[1:])
+        self.parse_line(line)
         self._next()
 
 

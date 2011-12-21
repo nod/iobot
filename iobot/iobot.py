@@ -75,7 +75,7 @@ class IrcObj(object):
 
         if not line.startswith(":"):
             # PING probably
-            self.stoks = line.split()
+            stoks = line.split()
             self.server_cmd = stoks[0].upper()
         else:
             tokens = line[1:].split(":")

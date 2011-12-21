@@ -60,27 +60,39 @@ class IrcProtoCmd(object):
 renick = re.compile("^(\w*?)!")
 
 class IrcObj(object):
-    # tries to guess about and populate something from an ircd statement
-    __slots__ = ('stoks', 'server_cmd', 'nick', 'chan',)
+    """
+    tries to guess and populate something from an ircd statement
+    """
+
+    __slots__ = ('stoks', 'server_cmd', 'nick', 'line', 'chan',)
 
     def __init__(self, line):
         # seed our members with None
         for s in self.__slots__: setattr(self, s, None)
 
+        # save off the raw line
+        self.line = line
+
         if not line.startswith(":"):
             # PING probably
-            stoks = line.split()
+            self.stoks = line.split()
             self.server_cmd = stoks[0].upper()
         else:
             tokens = line[1:].split(":")
             if not tokens: return
             stoks = tokens[0].split()
 
-            self.server_cmd = stoks[1].upper()
-
             # find originator
             nick = renick.findall(stoks[0])
-            if len(nick) == 1: self.nick = nick[0]
+            if len(nick) == 1:
+                self.nick = nick[0]
+                stoks = stoks[1:]
+
+            self.server_cmd = stoks[0].upper()
+            stoks = stoks[1:]
+
+            # save off remaining tokens
+            self.stoks = stoks
 
     def __unicode__(self):
         return ' :: '.join(
@@ -167,12 +179,17 @@ class IOBot(object):
         # finally, just fail
         return None
 
+    def _hooks(self, irco):
+        """
+        parses a completed ircObj for module hooks
+        """
+
     def _next(self):
         # go back on the loop looking for the next line of input
         self._stream.read_until('\r\n', self._incoming)
 
     def _incoming(self, line):
-        self.parse_line(line)
+        self._hooks(self.parse_line(line))
         self._next()
 
 

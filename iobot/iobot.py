@@ -130,20 +130,17 @@ class IOBot(object):
     def joinchan(self, chan):
         self._stream.write("JOIN :%s\r\n" % chan)
 
-    def sendchan(self, chan, msg, callback=None):
-        self._stream.write(
-            "PRIVMSG %s :%s\r\n" % (chan, msg),
-            callback=callback
-            )
+    def sendchan(self, chan, msg):
+        s =  "PRIVMSG {} :{}\r\n".format(chan, msg)
+        print "sendchan", s
+        self._stream.write(s)
+                             # PRIVMSG #223 :i am the walrus
+
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-        stream = self._stream = IOStream(_sock)
-        stream.connect((self.host, self.port), self._initial_connect)
-
-    def _initial_connect(self):
-        # send our initial mess
-        self._connected = True
+        self._stream = IOStream(_sock)
+        self._stream.connect((self.host, self.port))
         self._stream.write("NICK %s\r\n" % self.nick)
         self._stream.write("USER %s 0 * :%s\r\n" % (IDENT, REALNAME))
         self._next()
@@ -151,8 +148,8 @@ class IOBot(object):
     def parse_line(self, line):
         irc = IrcObj(line)
         if irc.server_cmd in self._irc_proto:
-            return self._irc_proto[irc.server_cmd](irc, line)
-        # log or something here
+            self._irc_proto[irc.server_cmd](irc, line)
+        return irc
 
     def _p_ping(self, irc, line):
         self._stream.write("PONG %s\r\n" % line[1])
@@ -189,6 +186,7 @@ class IOBot(object):
         self._stream.read_until('\r\n', self._incoming)
 
     def _incoming(self, line):
+        print "_incoming:", line
         self._hooks(self.parse_line(line))
         self._next()
 

@@ -1,12 +1,15 @@
 
-import nose, socket, threading, time, unittest
+import socket, threading, time, unittest
 from random import randint
 
+import mock, nose
 from tornado.ioloop import IOLoop
 from tornado.testing import AsyncTestCase
 
-from ..iobot import IOBot
+import sys, os.path
+sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..'))
 
+from iobot import IOBot
 
 class FakeIrcServer(threading.Thread):
 
@@ -137,66 +140,82 @@ class FakeIrcServer(threading.Thread):
             self.parse_line(buf)
 
 
+def patched_connect(self):
+    """
+    bypasses _connect on the object since we don't feel like patching all of
+    socket.socket and IOStream, we're just going to fake those.
+    """
+    self._stream = mock.MagicMock()
+    self._after_connect()
+
+
 class BotTestCases(AsyncTestCase):
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.fakeircd.stop()
-        del cls.fakeircd
+    """
+    i really wrestled with mocking IOStream.read_until and then i could call
+    bot._next() and have it do the right thing.  The problem is you end up in a
+    weird looping blocking situation.
 
-    @classmethod
-    def setUpClass(cls):
-        cls.port = randint(4000,59999)
-        cls.host = '127.0.0.1'
-        cls.nick = 'meh'
-        cls.fakeircd = FakeIrcServer(cls.host, cls.port)
-        cls.fakeircd.start()
+    It's just easier (not cleaner) to call bot._incoming(...) with the expected
+    input from the ircd and then let the parsing take over from there.  It
+    reduces code coverage slightly, but the methods not exposed to tests are
+    fairly limited and specific in their scope.
+    """
 
+    def ircin(self, stat, txt):
+        # NOT DONE YET
+        self.bot._incoming(':faker.irc {} {}\r\n'.format(stat, txt))
+
+    @mock.patch('iobot.IOBot._connect', patched_connect)
     def setUp(self):
         super(BotTestCases, self).setUp()
-        self.fakeircd.reset_msgs()
-        self.fakeircd.reset_protocol()
         self.bot = IOBot(
-                    nick = self.nick,
-                    host = self.host,
-                    port = self.port,
-                    on_ready = lambda: self.stop()
+                    nick = 'testie',
+                    host = 'localhost',
+                    port = 6667,
                     )
-        self.wait()
+        assert self.bot._stream.write.called
 
     def test_ping(self):
         # going to fake a PING from the server on this one
         self._was_pinged = False
         self.bot.hook('PING', lambda irc, ln: self.stop(True))
         self.bot.parse_line('PING :12345')
-        assert( self.wait() )
-        # assert(self.bot._handle_ping('PING :12345'))
+        assert self.wait()
+        assert self.bot._stream.write.called
 
     def test_join(self):
         # testing these together
         chan = '#testchan'
-        self.fakeircd.testing_callback = self.stop
         self.bot.joinchan(chan)
-        self.wait()
-        assert( chan in self.fakeircd._msgs )
+        assert self.bot._stream.write.called_with("JOIN :{}".format(chan))
+
+        # fake irc response to our join
+        self.bot._incoming(
+            ':{}!~{}@localhost JOIN :{}\r\n'.format(
+                self.bot.nick,
+                self.bot.nick,
+                chan
+                )
+            )
+        assert chan in self.bot.chans
 
     def test_msg(self):
-        self.fakeircd.testing_callback = self.stop
-        msg = 'i am the walrus'
-        self.bot.joinchan('#hello')
-        self.wait()
-        
+        chan, msg = "#hi", "i am the walrus"
+        self.bot.sendchan(chan, msg)
+        assert self.bot._stream.write.called_with(
+                "PRIVMSG {} :{}\r\n".format(chan, msg)
+                )
 
-        self.bot.sendchan('#hello', msg)
-        self.wait()
-
-        print "MSGS", self.fakeircd._msgs
-        self.assertEqual(
-            msg,
-            self.fakeircd._msgs['#hello'][-1]
+    def test_msg_to_unjoined_chan(self):
+        chan, msg = "hi", "i am the walrus"
+        ':faker.irc {} {}\r\n'.format(statusnum, txt)
+        self.bot._incoming(
+            ':faker.irc {} {}\r\n'.format(statusnum, txt)
+                "461 {} PRIVMSG:",
+                "No such channel"
             )
-
-
+                )
 
 
 

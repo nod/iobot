@@ -105,14 +105,26 @@ class IrcObj(object):
 
 class IOBot(object):
 
-    def __init__(self, nick, host, port=6667, owner='iobot'):
+    def __init__(
+            self,
+            host,
+            nick = 'hircules',
+            port = 6667,
+            owner = 'human',
+            initial_chans = None,
+            on_ready = None,
+            ):
+        """
+        create an irc bot instance.
+        @params
+        initial_chans: None or list of strings representing channels to join
+        """
         self.nick = nick
-        self.chans = set()
+        self.chans = set() # chans we're a member of
         self.owner = owner
         self.host = host
         self.port = port
         self._connected = False
-        self._connect()
         # used for parsing out nicks later, just wanted to compile it once
         # server protocol gorp
         self._irc_proto = dict(
@@ -122,6 +134,12 @@ class IOBot(object):
             )
         # build our user command list
         self.cmds = dict()
+
+        self._initial_chans = initial_chans
+        self._on_ready = on_ready
+
+        # finally, connect.
+        self._connect()
 
     def hook(self, cmd, hook_f):
         assert( cmd in self._irc_proto )
@@ -134,15 +152,24 @@ class IOBot(object):
         s =  "PRIVMSG {} :{}\r\n".format(chan, msg)
         print "sendchan", s
         self._stream.write(s)
-                             # PRIVMSG #223 :i am the walrus
-
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self._stream = IOStream(_sock)
-        self._stream.connect((self.host, self.port))
+        self._stream.connect((self.host, self.port), self._after_connect)
+        print "_stream.connect"
+
+    def _after_connect(self):
+        print "_after_connect"
         self._stream.write("NICK %s\r\n" % self.nick)
         self._stream.write("USER %s 0 * :%s\r\n" % (IDENT, REALNAME))
+
+        if self._initial_chans:
+            for c in self._initial_chans: self.joinchan(c)
+            del self._initial_chans
+        if self._on_ready:
+            print "calling _on_ready"
+            self._on_ready()
         self._next()
 
     def parse_line(self, line):
@@ -156,6 +183,7 @@ class IOBot(object):
 
     def _p_privmsg(self, irc, line):
         nick = renick.findall(line)
+        print "privmsg recvd:", line
         if len(nick) == 1: return tokens[1], nick[0], ' '.join(tokens[2:])
 
     def _p_afterjoin(self, irc, line):
@@ -200,13 +228,12 @@ def main():
     cc = sys.argv[2]
     ib = IOBot(
         nn,
-        host='127.0.0.1',
-        port=(int(sys.argv[3] if len(sys.argv)==4 else PORT))
+        host = '127.0.0.1',
+        port = (int(sys.argv[3] if len(sys.argv)==4 else PORT)),
+        initial_chans = [cc],
         )
-    ib.joinchan(cc)
     IOLoop.instance().start()
 
 
 if __name__ == '__main__':
     main()
-

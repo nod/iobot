@@ -151,12 +151,18 @@ class BotTestCases(AsyncTestCase):
         cls.nick = 'meh'
         cls.fakeircd = FakeIrcServer(cls.host, cls.port)
         cls.fakeircd.start()
-        cls.bot = IOBot(nick=cls.nick, host=cls.host, port=cls.port)
 
     def setUp(self):
         super(BotTestCases, self).setUp()
         self.fakeircd.reset_msgs()
         self.fakeircd.reset_protocol()
+        self.bot = IOBot(
+                    nick = self.nick,
+                    host = self.host,
+                    port = self.port,
+                    on_ready = lambda: self.stop()
+                    )
+        self.wait()
 
     def test_ping(self):
         # going to fake a PING from the server on this one
@@ -179,6 +185,7 @@ class BotTestCases(AsyncTestCase):
         msg = 'i am the walrus'
         self.bot.joinchan('#hello')
         self.wait()
+        
 
         self.bot.sendchan('#hello', msg)
         self.wait()

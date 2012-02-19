@@ -1,8 +1,5 @@
 
-import unittest
-
-import mock, nose
-from tornado.ioloop import IOLoop
+import mock
 from tornado.testing import AsyncTestCase
 
 import sys, os.path

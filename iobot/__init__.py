@@ -1,1 +1,1 @@
-from .iobot import IOBot
+from .iobot import IOBot, Plugin

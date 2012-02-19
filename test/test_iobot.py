@@ -9,7 +9,7 @@ from tornado.testing import AsyncTestCase
 import sys, os.path
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..'))
 
-from iobot import IOBot
+from iobot import IOBot, Plugin
 
 class FakeIrcServer(threading.Thread):
 
@@ -163,8 +163,10 @@ class BotTestCases(AsyncTestCase):
     """
 
     def ircin(self, stat, txt):
-        # NOT DONE YET
-        self.bot._incoming(':faker.irc {} {}\r\n'.format(stat, txt))
+        self.bot._incoming(':faker.irc {} :{}\r\n'.format(stat, txt))
+
+    def rawircin(self, txt):
+        self.bot._incoming(txt)
 
     @mock.patch('iobot.IOBot._connect', patched_connect)
     def setUp(self):
@@ -180,7 +182,7 @@ class BotTestCases(AsyncTestCase):
         # going to fake a PING from the server on this one
         self._was_pinged = False
         self.bot.hook('PING', lambda irc, ln: self.stop(True))
-        self.bot.parse_line('PING :12345')
+        self.rawircin('PING :12345')
         assert self.wait()
         assert self.bot._stream.write.called
 
@@ -190,8 +192,10 @@ class BotTestCases(AsyncTestCase):
         self.bot.joinchan(chan)
         assert self.bot._stream.write.called_with("JOIN :{}".format(chan))
 
+    def test_parse_join(self):
+        chan = '#testchan'
         # fake irc response to our join
-        self.bot._incoming(
+        self.rawircin(
             ':{}!~{}@localhost JOIN :{}\r\n'.format(
                 self.bot.nick,
                 self.bot.nick,
@@ -202,22 +206,38 @@ class BotTestCases(AsyncTestCase):
 
     def test_msg(self):
         chan, msg = "#hi", "i am the walrus"
-        self.bot.sendchan(chan, msg)
-        assert self.bot._stream.write.called_with(
+        self.bot.say(chan, msg)
+        assert self.bot._stream.write.called
+
+
+        self.bot._stream.write.assert_called_with(
                 "PRIVMSG {} :{}\r\n".format(chan, msg)
                 )
 
-    def test_msg_to_unjoined_chan(self):
-        chan, msg = "hi", "i am the walrus"
-        ':faker.irc {} {}\r\n'.format(statusnum, txt)
-        self.bot._incoming(
-            ':faker.irc {} {}\r\n'.format(statusnum, txt)
-                "461 {} PRIVMSG:",
-                "No such channel"
+    def test_parse_msg_to_unjoined(self):
+        chan = "#hi"
+        self.bot.chans.add(chan) # fake join msg
+        # :senor.crunchybueno.com 401 nodnc  #xx :No such nick/channel
+        self.ircin(
+            "401 {} {}".format(self.bot.nick, chan),
+            "No such nick/channel"
             )
+        assert chan not in self.bot.chans
+
+    def test_plugin_echo(self):
+
+        class Echo(Plugin):
+            def on_content(self, irc):
+                irc.say(irc.content)
+        self.bot.register(Echo())
+
+        # :nod!~nod@crunchy.bueno.land PRIVMSG #xx :hi
+        self.ircin("PRIVMSG #xx", "hi")
+
+        print "MOCK", self.bot._stream.write.call_args_list
+        self.bot._stream.write.assert_called_with(
+                "PRIVMSG {} :{}\r\n".format("#xx", "hi")
                 )
-
-
 
 
 

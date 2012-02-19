@@ -41,13 +41,17 @@ def irc_cmd(func, cmd=None):
     return func
 
 
-class BotPlugin(object):
+class Plugin(object):
 
-    def __init__(self, bot):
-        self.bot = bot
+    def __call__(self, irc):
+        self.on_content(irc)
+
+    def on_msg(self, irc):
+        pass
 
 
 class IrcProtoCmd(object):
+
     def __init__(self, actn):
         self.hooks = set()
         self.actn = actn
@@ -64,43 +68,43 @@ class IrcObj(object):
     tries to guess and populate something from an ircd statement
     """
 
-    __slots__ = ('stoks', 'server_cmd', 'nick', 'line', 'chan',)
-
-    def __init__(self, line):
-        # seed our members with None
-        for s in self.__slots__: setattr(self, s, None)
-
-        # save off the raw line
+    def __init__(self, line, bot):
+        self.server_cmd = self.chan = self.nick = None
+        self._bot = bot
         self.line = line
+        self._parse_line(line)
+
+    def _parse_line(self, line):
 
         if not line.startswith(":"):
-            # PING probably
+            # PING most likely
             stoks = line.split()
             self.server_cmd = stoks[0].upper()
-        else:
-            tokens = line[1:].split(":")
-            if not tokens: return
-            stoks = tokens[0].split()
+            return
 
-            # find originator
-            nick = renick.findall(stoks[0])
-            if len(nick) == 1:
-                self.nick = nick[0]
-                stoks = stoks[1:]
+        # :senor.crunchybueno.com 401 nodnc  #xx :No such nick/channel
+        # :nod!~nod@crunchy.bueno.land PRIVMSG xyz :hi
 
-            self.server_cmd = stoks[0].upper()
-            stoks = stoks[1:]
+        tokens = line[1:].split(":")
+        if not tokens: return
 
-            # save off remaining tokens
-            self.stoks = stoks
+        stoks = tokens[0].split()
 
-    def __unicode__(self):
-        return ' :: '.join(
-            '{}:{}'.format(s,getattr(self,s)) for s in self.__slots__
-            )
+        # find originator
+        nick = renick.findall(stoks[0])
+        if len(nick) == 1:
+            self.nick = nick[0]
+        stoks = stoks[1:] # strip off server tok
 
-    def __repr__(self):
-        return self.__unicode__()
+        self.server_cmd = stoks[0].upper()
+        stoks = stoks[1:]
+
+        # save off remaining tokens
+        self.stoks = stoks
+
+    def say(self, text, dest=None):
+        print "SAYING to:", dest, self.chan
+        self._bot.say(dest or self.chan, text)
 
 
 class IOBot(object):
@@ -124,14 +128,16 @@ class IOBot(object):
         self.owner = owner
         self.host = host
         self.port = port
+        self._plugins = set()
         self._connected = False
         # used for parsing out nicks later, just wanted to compile it once
         # server protocol gorp
-        self._irc_proto = dict(
-            PRIVMSG = IrcProtoCmd(self._p_privmsg),
-            PING = IrcProtoCmd(self._p_ping),
-            JOIN = IrcProtoCmd(self._p_afterjoin),
-            )
+        self._irc_proto = {
+            'PRIVMSG' : IrcProtoCmd(self._p_privmsg),
+            'PING'    : IrcProtoCmd(self._p_ping),
+            'JOIN'    : IrcProtoCmd(self._p_afterjoin),
+            '401'     : IrcProtoCmd(self._p_nochan),
+            }
         # build our user command list
         self.cmds = dict()
 
@@ -148,19 +154,24 @@ class IOBot(object):
     def joinchan(self, chan):
         self._stream.write("JOIN :%s\r\n" % chan)
 
-    def sendchan(self, chan, msg):
-        s =  "PRIVMSG {} :{}\r\n".format(chan, msg)
-        print "sendchan", s
-        self._stream.write(s)
+    def say(self, chan, msg):
+        """
+        sends a message to a chan or user
+        """
+        self._stream.write("PRIVMSG {} :{}\r\n".format(chan, msg))
+
+    def register(self, plugin):
+        """
+        accepts an instance of Plugin to add to the callback chain
+        """
+        self._plugins.add(plugin)
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self._stream = IOStream(_sock)
         self._stream.connect((self.host, self.port), self._after_connect)
-        print "_stream.connect"
 
     def _after_connect(self):
-        print "_after_connect"
         self._stream.write("NICK %s\r\n" % self.nick)
         self._stream.write("USER %s 0 * :%s\r\n" % (IDENT, REALNAME))
 
@@ -168,12 +179,11 @@ class IOBot(object):
             for c in self._initial_chans: self.joinchan(c)
             del self._initial_chans
         if self._on_ready:
-            print "calling _on_ready"
             self._on_ready()
         self._next()
 
-    def parse_line(self, line):
-        irc = IrcObj(line)
+    def _parse_line(self, line):
+        irc = IrcObj(line, self)
         if irc.server_cmd in self._irc_proto:
             self._irc_proto[irc.server_cmd](irc, line)
         return irc
@@ -182,9 +192,10 @@ class IOBot(object):
         self._stream.write("PONG %s\r\n" % line[1])
 
     def _p_privmsg(self, irc, line):
-        nick = renick.findall(line)
-        print "privmsg recvd:", line
-        if len(nick) == 1: return tokens[1], nick[0], ' '.join(tokens[2:])
+        # :nod!~nod@crunchy.bueno.land PRIVMSG #xx :hi
+        toks = line[1:].split(':')[0].split()
+        irc.chan = toks[-1] # should be last token after last :
+        irc.content = line[line.find(':',1)+1:].strip()
 
     def _p_afterjoin(self, irc, line):
         toks = line.strip().split(':')
@@ -193,29 +204,24 @@ class IOBot(object):
         irc.chan = toks[-1] # should be last token after last :
         self.chans.add(irc.chan)
 
-    def getcmd(self,cmd):
-        if CMDCHAR and not cmd.startswith(CMDCHAR): return None
-        c = cmd[len(CMDCHAR):]
-        # first look for the exact command
-        if self.cmds.has_key(c): return self.cmds[c]
-        # then look for any uniq commands
-        tmpcmds = [k for k in self.cmds.keys() if k.startswith(c)]
-        if len(tmpcmds) == 1: return self.cmds[tmpcmds[0]]
-        # finally, just fail
-        return None
+    def _p_nochan(self, irc, line):
+        # :senor.crunchybueno.com 401 nodnc  #xx :No such nick/channel
+        toks = line.strip().split(':')
+        irc.chan = toks[1].strip().split()[-1]
+        if irc.chan in self.chans: self.chans.remove(irc.chan)
 
-    def _hooks(self, irco):
-        """
-        parses a completed ircObj for module hooks
-        """
+    def _process_plugins(self, irc):
+        """ parses a completed ircObj for module hooks """
+        for p in self._plugins:
+            print "PLUGIN TYPE", p
+            p(irc)
 
     def _next(self):
         # go back on the loop looking for the next line of input
         self._stream.read_until('\r\n', self._incoming)
 
     def _incoming(self, line):
-        print "_incoming:", line
-        self._hooks(self.parse_line(line))
+        self._process_plugins(self._parse_line(line))
         self._next()
 
 
@@ -227,10 +233,10 @@ def main():
     nn = sys.argv[1]
     cc = sys.argv[2]
     ib = IOBot(
-        nn,
-        host = '127.0.0.1',
-        port = (int(sys.argv[3] if len(sys.argv)==4 else PORT)),
-        initial_chans = [cc],
+        'iobot',
+        host = 'senor.crunchybueno.com',
+        port = 6667,
+        initial_chans = ['#33ad'],
         )
     IOLoop.instance().start()
 

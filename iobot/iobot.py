@@ -11,13 +11,6 @@ from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 
 
-HOST,PORT = "127.0.0.1", 6667
-NICK,IDENT,REALNAME = "b0t", "b0ttle", "b0ttle"
-CHAN = "#b0t"
-CMDCHAR = "."
-OWNER = "nod"
-
-
 def irc_cmd(func, cmd=None):
     """
     decorator for methods to be exposed as irc commands
@@ -173,7 +166,7 @@ class IOBot(object):
 
     def _after_connect(self):
         self._stream.write("NICK %s\r\n" % self.nick)
-        self._stream.write("USER %s 0 * :%s\r\n" % (IDENT, REALNAME))
+        self._stream.write("USER %s 0 * :%s\r\n" % ("iobot", "iobot"))
 
         if self._initial_chans:
             for c in self._initial_chans: self.joinchan(c)

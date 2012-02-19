@@ -44,9 +44,9 @@ def irc_cmd(func, cmd=None):
 class Plugin(object):
 
     def __call__(self, irc):
-        self.on_content(irc)
+        if irc.content: self.on_content(irc)
 
-    def on_msg(self, irc):
+    def on_content(self, irc):
         pass
 
 
@@ -69,7 +69,7 @@ class IrcObj(object):
     """
 
     def __init__(self, line, bot):
-        self.server_cmd = self.chan = self.nick = None
+        self.content = self.server_cmd = self.chan = self.nick = None
         self._bot = bot
         self.line = line
         self._parse_line(line)
@@ -213,7 +213,6 @@ class IOBot(object):
     def _process_plugins(self, irc):
         """ parses a completed ircObj for module hooks """
         for p in self._plugins:
-            print "PLUGIN TYPE", p
             p(irc)
 
     def _next(self):
@@ -226,18 +225,18 @@ class IOBot(object):
 
 
 def main():
-    import sys
-    if len(sys.argv) < 3:
-        print "usage: bot <nick> <chan>"
-        raise SystemExit
-    nn = sys.argv[1]
-    cc = sys.argv[2]
     ib = IOBot(
-        'iobot',
         host = 'senor.crunchybueno.com',
+        nick = 'iobot',
         port = 6667,
         initial_chans = ['#33ad'],
         )
+
+    class Echo(Plugin):
+        def on_content(self, irc):
+            irc.say(irc.content)
+    ib.register(Echo())
+
     IOLoop.instance().start()
 
 

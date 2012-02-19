@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 import re
 import socket
-import string
-import StringIO
-import sys
-from random import shuffle, randint, sample
-from os import uname
 
 from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
@@ -96,7 +91,6 @@ class IrcObj(object):
         self.stoks = stoks
 
     def say(self, text, dest=None):
-        print "SAYING to:", dest, self.chan
         self._bot.say(dest or self.chan, text)
 
 

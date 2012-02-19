@@ -7,6 +7,7 @@ sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..'))
 
 from iobot import IOBot, Plugin
 
+
 def patched_connect(self):
     """
     bypasses _connect on the object since we don't feel like patching all of
@@ -92,10 +93,9 @@ class BotTestCases(AsyncTestCase):
         assert chan not in self.bot.chans
 
     def test_plugin_echo(self):
-
         class Echo(Plugin):
-            def on_content(self, irc):
-                irc.say(irc.content)
+            def on_text(self, irc):
+                irc.say(irc.text)
         self.bot.register(Echo())
 
         # :nod!~nod@crunchy.bueno.land PRIVMSG #xx :hi

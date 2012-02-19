@@ -5,37 +5,7 @@ import socket
 from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 
-
-def irc_cmd(func, cmd=None):
-    """
-    decorator for methods to be exposed as irc commands
-
-    The following:
-        class Plugin(BotPlugin):
-            @irc_cmd
-            def blah(self):
-                pass
-    will result in a new irc commend of 'blah'.
-
-    Can also be used to decorate an existing method and rename the command.
-        class Plugin(BotPlugin):
-            def blah(self):
-                pass
-            irc_cmd(blah, 'foo')
-    The above would result in a new irc command, 'foo'.
-    """
-    if not hasattr(func, 'irc_cmd'): func.irc_cmd = set()
-    func.irc_cmd.add(cmd or func.func_name)
-    return func
-
-
-class Plugin(object):
-
-    def __call__(self, irc):
-        if irc.content: self.on_content(irc)
-
-    def on_content(self, irc):
-        pass
+from . import Plugin
 
 
 class IrcProtoCmd(object):
@@ -46,7 +16,8 @@ class IrcProtoCmd(object):
 
     def __call__(self, irc, ln):
         self.actn(irc, ln)
-        for h in self.hooks: h(irc, ln)
+        for h in self.hooks:
+            h(irc, ln)
 
 
 renick = re.compile("^(\w*?)!")
@@ -57,7 +28,7 @@ class IrcObj(object):
     """
 
     def __init__(self, line, bot):
-        self.content = self.server_cmd = self.chan = self.nick = None
+        self.text = self.server_cmd = self.chan = self.nick = None
         self._bot = bot
         self.line = line
         self._parse_line(line)
@@ -115,7 +86,7 @@ class IOBot(object):
         self.owner = owner
         self.host = host
         self.port = port
-        self._plugins = set()
+        self._plugins = dict()
         self._connected = False
         # used for parsing out nicks later, just wanted to compile it once
         # server protocol gorp
@@ -135,6 +106,11 @@ class IOBot(object):
         self._connect()
 
     def hook(self, cmd, hook_f):
+        """
+        allows easy hooking of any raw irc protocol statement.  These will be
+        executed after the initial protocol parsing occurs.  Plugins can use this
+        to extend their reach lower into the protocol.
+        """
         assert( cmd in self._irc_proto )
         self._irc_proto[cmd].hooks.add(hook_f)
 
@@ -151,7 +127,7 @@ class IOBot(object):
         """
         accepts an instance of Plugin to add to the callback chain
         """
-        self._plugins.add(plugin)
+        self._plugins[plugin.__class__] = plugin
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -182,7 +158,7 @@ class IOBot(object):
         # :nod!~nod@crunchy.bueno.land PRIVMSG #xx :hi
         toks = line[1:].split(':')[0].split()
         irc.chan = toks[-1] # should be last token after last :
-        irc.content = line[line.find(':',1)+1:].strip()
+        irc.text = line[line.find(':',1)+1:].strip()
 
     def _p_afterjoin(self, irc, line):
         toks = line.strip().split(':')
@@ -199,8 +175,8 @@ class IOBot(object):
 
     def _process_plugins(self, irc):
         """ parses a completed ircObj for module hooks """
-        for p in self._plugins:
-            p(irc)
+        for name,plug in self._plugins.iteritems():
+            plug(irc)
 
     def _next(self):
         # go back on the loop looking for the next line of input
@@ -220,8 +196,8 @@ def main():
         )
 
     class Echo(Plugin):
-        def on_content(self, irc):
-            irc.say(irc.content)
+        def on_text(self, irc):
+            irc.say(irc.text)
     ib.register(Echo())
 
     IOLoop.instance().start()

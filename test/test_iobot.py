@@ -104,7 +104,6 @@ class BotTestCases(AsyncTestCase):
         # :nod!~nod@crunchy.bueno.land PRIVMSG #xx :hi
         self.ircin("PRIVMSG #xx", "hi")
 
-        print "MOCK", self.bot._stream.write.call_args_list
         self.bot._stream.write.assert_called_with(
                 "PRIVMSG {} :{}\r\n".format("#xx", "hi")
                 )

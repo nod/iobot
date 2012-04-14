@@ -5,7 +5,14 @@ import socket
 from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 
-from . import Plugin
+
+class TextPlugin(object):
+
+    def __call__(self, irc):
+        if irc.text: self.on_text(irc)
+
+    def on_text(self, irc):
+        pass
 
 
 class IrcProtoCmd(object):
@@ -21,6 +28,7 @@ class IrcProtoCmd(object):
 
 
 renick = re.compile("^(\w*?)!")
+
 
 class IrcObj(object):
     """
@@ -195,9 +203,10 @@ def main():
         initial_chans = ['#33ad'],
         )
 
-    class Echo(Plugin):
+    class Echo(TextPlugin):
         def on_text(self, irc):
             irc.say(irc.text)
+
     ib.register(Echo())
 
     IOLoop.instance().start()
@@ -205,3 +214,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

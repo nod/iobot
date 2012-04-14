@@ -5,7 +5,7 @@ from tornado.testing import AsyncTestCase
 import sys, os.path
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..'))
 
-from iobot import IOBot, Plugin
+from iobot import IOBot, TextPlugin
 
 
 def patched_connect(self):
@@ -93,7 +93,7 @@ class BotTestCases(AsyncTestCase):
         assert chan not in self.bot.chans
 
     def test_plugin_echo(self):
-        class Echo(Plugin):
+        class Echo(TextPlugin):
             def on_text(self, irc):
                 irc.say(irc.text)
         self.bot.register(Echo())

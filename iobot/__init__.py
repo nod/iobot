@@ -1,4 +1,3 @@
-from .plugin import Plugin
-from .iobot import IOBot
+from .iobot import IOBot, TextPlugin
 
-IOBot, Plugin # completely lame but keeps pyflakes from griping
+IOBot, TextPlugin # completely lame but keeps pyflakes from griping

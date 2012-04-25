@@ -1,14 +1,15 @@
 
-import mock
-from tornado.testing import AsyncTestCase
-
 import sys, os.path
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..'))
 
-from iobot import IOBot, TextPlugin
+from unittest import TestCase
 
+import mock
+from tornado.testing import AsyncTestCase
 
-def patched_connect(self):
+from iobot import IOBot, CommandRegister, TextPlugin
+
+def _patched_connect(self):
     """
     bypasses _connect on the object since we don't feel like patching all of
     socket.socket and IOStream, we're just going to fake those.
@@ -36,7 +37,7 @@ class BotTestCases(AsyncTestCase):
     def rawircin(self, txt):
         self.bot._incoming(txt)
 
-    @mock.patch('iobot.IOBot._connect', patched_connect)
+    @mock.patch('iobot.IOBot._connect', _patched_connect)
     def setUp(self):
         super(BotTestCases, self).setUp()
         self.bot = IOBot(
@@ -105,5 +106,26 @@ class BotTestCases(AsyncTestCase):
                 "PRIVMSG {} :{}\r\n".format("#xx", "hi")
                 )
 
+class CommandRegisterTests(TestCase):
 
+    def test_instance(self):
+        c = CommandRegister()
+        assert c is CommandRegister() is not CommandRegister
+
+    def test_register_and_exec(self):
+
+        class Tester(TextPlugin):
+            def __init__(self):
+                self.register('go', self.go)
+            def go(self, irc):
+                return 23
+
+        t = Tester()
+
+        # confirms command registration
+        assert 'go' in CommandRegister()
+        assert 'went' not in CommandRegister()
+
+        # now text execution
+        assert 23 == CommandRegister().cmdexec('go', None)
 

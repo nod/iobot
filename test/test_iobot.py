@@ -120,7 +120,7 @@ class CommandRegisterTests(TestCase):
             def go(self, irc):
                 return 23
 
-        t = Tester()
+        Tester()
 
         # confirms command registration
         assert 'go' in CommandRegister()

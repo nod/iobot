@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 VERSION = open('VERSION').read().lstrip('version: ').rstrip('\n')
 
@@ -12,8 +12,8 @@ setup(
     author_email = 'jeremy@33ad.org',
     url = 'https://github.com/nod/iobot',
     license = "http://www.apache.org/licenses/LICENSE-2.0",
-    packages = ['iobot'],
+    packages = find_packages(),
     package_dir={'mypkg': 'src/mypkg'},
-    install_requires = ['tornado', 'nose', 'mock']
+    install_requires = ['tornado', 'nose', 'mock', 'requests']
     )
 

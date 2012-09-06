@@ -1,5 +1,5 @@
-from plugins import TextPlugin
-from plugins.decorators import plugin_command
+from iobot.plugins import TextPlugin
+from iobot.plugins.decorators import plugin_command
 
 class Echo(TextPlugin):
 

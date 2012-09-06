@@ -5,7 +5,7 @@ import socket
 from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 
-from plugin import CommandRegister, TextPlugin
+from plugins import CommandRegister, TextPlugin
 
 class IrcProtoCmd(object):
 
@@ -31,6 +31,8 @@ class IrcObj(object):
         self.text = self.server_cmd = self.chan = self.nick = None
         self._bot = bot
         self.line = line
+        self.command = None
+        self.command_args = None
         self._parse_line(line)
 
     def _parse_line(self, line):
@@ -64,6 +66,9 @@ class IrcObj(object):
     def say(self, text, dest=None):
         self._bot.say(dest or self.chan, text)
 
+    def error(self, text, dest=None):
+        self.say(dest or self.chan, "error: %s" % text)
+
 
 class IOBot(object):
 
@@ -72,7 +77,8 @@ class IOBot(object):
             host,
             nick = 'hircules',
             port = 6667,
-            owner = 'human',
+            char = '@',
+            owner = 'owner',
             initial_chans = None,
             on_ready = None,
             ):
@@ -86,6 +92,7 @@ class IOBot(object):
         self.owner = owner
         self.host = host
         self.port = port
+        self.char = char
         self._plugins = dict()
         self._connected = False
         # used for parsing out nicks later, just wanted to compile it once
@@ -123,11 +130,22 @@ class IOBot(object):
         """
         self._stream.write("PRIVMSG {} :{}\r\n".format(chan, msg))
 
-    def register(self, plugin):
+    def register(self, plugins):
         """
         accepts an instance of Plugin to add to the callback chain
         """
-        self._plugins[plugin.__class__] = plugin
+        for p in plugins:
+            p_module = __import__('plugins.%s.plugin'%p, fromlist=['Plugin'])
+            p_obj = p_module.Plugin()
+
+            cmds = []
+            for method in dir(p_obj):
+                if callable(getattr(p_obj, method)) \
+                    and hasattr(getattr(p_obj, method), 'cmd'):
+                    cmds.append(method)
+
+            for cmd in cmds:
+                self._plugins[cmd] = p_obj
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -159,6 +177,10 @@ class IOBot(object):
         toks = line[1:].split(':')[0].split()
         irc.chan = toks[-1] # should be last token after last :
         irc.text = line[line.find(':',1)+1:].strip()
+        if irc.text and irc.text.startswith(self.char):
+            text_split = irc.text.split()
+            irc.command = text_split[0][1:]
+            irc.command_args = ' '.join(text_split[1:])
 
     def _p_afterjoin(self, irc, line):
         toks = line.strip().split(':')
@@ -175,8 +197,19 @@ class IOBot(object):
 
     def _process_plugins(self, irc):
         """ parses a completed ircObj for module hooks """
-        for name,plug in self._plugins.iteritems():
-            plug(irc)
+        try:
+            plugin = self._plugins.get(irc.command) if irc.command else None
+        except KeyError:
+            # plugin does not exist
+            pass
+
+        try:
+            if plugin:
+                plugin_method = getattr(plugin, irc.command)
+                plugin_method(irc)
+        except:
+            doc = "usage: %s %s" % (irc.command, plugin_method.__doc__)
+            irc.say(doc)
 
     def _next(self):
         # go back on the loop looking for the next line of input
@@ -191,15 +224,13 @@ def main():
     ib = IOBot(
         host = 'senor.crunchybueno.com',
         nick = 'iobot',
+        char = '$',
+        owner = 'owner',
         port = 6667,
         initial_chans = ['#33ad'],
         )
 
-    class Echo(TextPlugin):
-        def on_text(self, irc):
-            irc.say(irc.text)
-
-    ib.register(Echo())
+    ib.register(['echo','stock'])
 
     IOLoop.instance().start()
 

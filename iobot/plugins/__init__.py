@@ -1,3 +1,4 @@
+import requests
 
 class IrcCommandException(Exception):
     """ base class for irc commands """
@@ -49,6 +50,8 @@ class TextPlugin(BasePlugin):
         pass
 
 
-
+class UtilityMixin(object):
+    """ provides basic utilities for plugins """
+    _requests = requests
 
 

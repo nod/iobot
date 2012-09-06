@@ -1,10 +1,11 @@
 from plugins import TextPlugin, UtilityMixin
+from plugins.decorators import plugin_command
 
 class Stock(TextPlugin, UtilityMixin):
-    def __repr__(self): return 'rtsq'
 
-    def on_text(self, irc):
-        data = self._get_data(irc.module_args)
+    @plugin_command
+    def rtsq(self, irc):
+        data = self._get_data(irc.command_args)
         if data[1] != '0.00':
             irc.say('The current price of %s is %s, as of %s EST.  '
                     'A change of %s from the last business day.' %

@@ -1,10 +1,10 @@
 from plugins import TextPlugin
+from plugins.decorators import plugin_command
 
 class Echo(TextPlugin):
-    def __repr__(self): return 'echo'
 
-    def on_text(self, irc):
-        irc.say("%s" % irc.module_args)
-
+    @plugin_command
+    def echo(self, irc):
+        irc.say("%s" % irc.command_args)
 
 Plugin = Echo

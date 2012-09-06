@@ -31,8 +31,8 @@ class IrcObj(object):
         self.text = self.server_cmd = self.chan = self.nick = None
         self._bot = bot
         self.line = line
-        self.module = None
-        self.module_args = None
+        self.command = None
+        self.command_args = None
         self._parse_line(line)
 
     def _parse_line(self, line):
@@ -78,7 +78,7 @@ class IOBot(object):
             nick = 'hircules',
             port = 6667,
             char = '@',
-            owner = 'norf',
+            owner = 'owner',
             initial_chans = None,
             on_ready = None,
             ):
@@ -137,7 +137,15 @@ class IOBot(object):
         for p in plugins:
             p_module = __import__('plugins.%s.plugin'%p, fromlist=['Plugin'])
             p_obj = p_module.Plugin()
-            self._plugins[str(p_obj)] = p_obj
+
+            cmds = []
+            for method in dir(p_obj):
+                if callable(getattr(p_obj, method)) \
+                    and hasattr(getattr(p_obj, method), 'cmd'):
+                    cmds.append(method)
+
+            for cmd in cmds:
+                self._plugins[cmd] = p_obj
 
     def _connect(self):
         _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -171,8 +179,8 @@ class IOBot(object):
         irc.text = line[line.find(':',1)+1:].strip()
         if irc.text and irc.text.startswith(self.char):
             text_split = irc.text.split()
-            irc.module = text_split[0][1:]
-            irc.module_args = ' '.join(text_split[1:])
+            irc.command = text_split[0][1:]
+            irc.command_args = ' '.join(text_split[1:])
 
     def _p_afterjoin(self, irc, line):
         toks = line.strip().split(':')
@@ -190,13 +198,13 @@ class IOBot(object):
     def _process_plugins(self, irc):
         """ parses a completed ircObj for module hooks """
         try:
-            plugin = self._plugins.get(irc.module) if irc.module else None
+            plugin = self._plugins.get(irc.command) if irc.command else None
         except KeyError:
             # plugin does not exist
             pass
 
         if plugin:
-            plugin(irc)
+            getattr(plugin, irc.command)(irc)
 
     def _next(self):
         # go back on the loop looking for the next line of input
@@ -211,6 +219,8 @@ def main():
     ib = IOBot(
         host = 'senor.crunchybueno.com',
         nick = 'iobot',
+        char = '$',
+        owner = 'owner',
         port = 6667,
         initial_chans = ['#33ad'],
         )

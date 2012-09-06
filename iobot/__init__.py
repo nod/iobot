@@ -67,7 +67,7 @@ class IrcObj(object):
         self._bot.say(dest or self.chan, text)
 
     def error(self, text, dest=None):
-        self.say("error: %s", text, dest)
+        self.say(dest or self.chan, "error: %s" % text)
 
 
 class IOBot(object):
@@ -203,8 +203,13 @@ class IOBot(object):
             # plugin does not exist
             pass
 
-        if plugin:
-            getattr(plugin, irc.command)(irc)
+        try:
+            if plugin:
+                plugin_method = getattr(plugin, irc.command)
+                plugin_method(irc)
+        except:
+            doc = "usage: %s %s" % (irc.command, plugin_method.__doc__)
+            irc.say(doc)
 
     def _next(self):
         # go back on the loop looking for the next line of input

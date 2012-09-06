@@ -5,7 +5,7 @@ import socket
 from tornado.ioloop import IOLoop
 from tornado.iostream import IOStream
 
-from plugins import CommandRegister, TextPlugin
+from iobot.plugins import CommandRegister, TextPlugin
 
 class IrcProtoCmd(object):
 
@@ -135,7 +135,11 @@ class IOBot(object):
         accepts an instance of Plugin to add to the callback chain
         """
         for p in plugins:
-            p_module = __import__('plugins.%s.plugin'%p, fromlist=['Plugin'])
+            # update to support custom paths?
+            p_module = __import__(
+                'iobot.plugins.%s.plugin'%p,
+                fromlist=['Plugin']
+                )
             p_obj = p_module.Plugin()
 
             cmds = []

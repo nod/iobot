@@ -1,5 +1,5 @@
-from plugins import TextPlugin, UtilityMixin
-from plugins.decorators import plugin_command
+from iobot.plugins import TextPlugin, UtilityMixin
+from iobot.plugins.decorators import plugin_command
 
 class Stock(TextPlugin, UtilityMixin):
 
